@@ -115,6 +115,7 @@ class VLCReStreamerRtsp: VLCReStreamerBase {
 
   override fun onSpsPpsVpsRtp(sps: ByteBuffer, pps: ByteBuffer, vps: ByteBuffer?) {
     rtspClient.setSPSandPPS(sps, pps, vps)
+    rtspClient.connect()
   }
 
   override fun getH264DataRtp(h264Buffer: ByteBuffer, info: MediaCodec.BufferInfo) {
