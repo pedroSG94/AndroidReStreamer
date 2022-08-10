@@ -2,8 +2,6 @@ package com.streye.androidrestreamer.plugin
 
 import android.content.Context
 import android.media.MediaCodec
-import android.os.Build
-import android.support.annotation.RequiresApi
 import com.pedro.encoder.utils.CodecUtil
 import com.pedro.rtplibrary.view.LightOpenGlView
 import com.pedro.rtplibrary.view.OpenGlView
@@ -21,18 +19,15 @@ class VLCReStreamerRtsp: VLCReStreamerBase {
 
   private val rtspClient: RtspClient
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(openGlView: OpenGlView, connectChecker: ConnectCheckerRtsp) : super(openGlView) {
     rtspClient = RtspClient(connectChecker)
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(lightOpenGlView: LightOpenGlView, connectChecker: ConnectCheckerRtsp) :
       super(lightOpenGlView) {
     rtspClient = RtspClient(connectChecker)
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(context: Context, connectChecker: ConnectCheckerRtsp) : super(context) {
     rtspClient = RtspClient(connectChecker)
   }
@@ -97,12 +92,11 @@ class VLCReStreamerRtsp: VLCReStreamerBase {
   }
 
   override fun prepareAudioRtp(isStereo: Boolean, sampleRate: Int) {
-    rtspClient.setIsStereo(isStereo)
-    rtspClient.setSampleRate(sampleRate)
+    rtspClient.setAudioInfo(sampleRate, isStereo)
   }
 
   override fun startStreamRtp(url: String) {
-    rtspClient.setUrl(url)
+    rtspClient.connect(url)
   }
 
   override fun stopStreamRtp() {
@@ -114,8 +108,7 @@ class VLCReStreamerRtsp: VLCReStreamerBase {
   }
 
   override fun onSpsPpsVpsRtp(sps: ByteBuffer, pps: ByteBuffer, vps: ByteBuffer?) {
-    rtspClient.setSPSandPPS(sps, pps, vps)
-    rtspClient.connect()
+    rtspClient.setVideoInfo(sps, pps, vps)
   }
 
   override fun getH264DataRtp(h264Buffer: ByteBuffer, info: MediaCodec.BufferInfo) {

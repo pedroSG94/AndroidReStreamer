@@ -3,9 +3,8 @@ package com.streye.androidrestreamer.plugin
 import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.os.Build
-import android.support.annotation.RequiresApi
 import android.util.Log
+import com.pedro.encoder.Frame
 import com.pedro.encoder.audio.AudioEncoder
 import com.pedro.encoder.audio.GetAacData
 import com.pedro.encoder.input.audio.GetMicrophoneData
@@ -15,7 +14,9 @@ import com.pedro.encoder.utils.CodecUtil
 import com.pedro.encoder.video.FormatVideoEncoder
 import com.pedro.encoder.video.GetVideoData
 import com.pedro.encoder.video.VideoEncoder
-import com.pedro.rtplibrary.base.RecordController
+import com.pedro.rtplibrary.base.recording.BaseRecordController
+import com.pedro.rtplibrary.base.recording.RecordController
+import com.pedro.rtplibrary.util.AndroidMuxerRecordController
 import com.pedro.rtplibrary.view.GlInterface
 import com.pedro.rtplibrary.view.LightOpenGlView
 import com.pedro.rtplibrary.view.OffScreenGlThread
@@ -43,11 +44,10 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
   private var streaming = false
   private var videoEnabled = true
   private var onPreview = false
-  private lateinit var recordController: RecordController
+  private lateinit var recordController: BaseRecordController
 
   private val options = arrayListOf(":fullscreen")
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(openGlView: OpenGlView) {
     context = openGlView.context
     this.glInterface = openGlView
@@ -55,7 +55,6 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
     init()
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(lightOpenGlView: LightOpenGlView) {
     context = lightOpenGlView.context
     this.glInterface = lightOpenGlView
@@ -63,7 +62,6 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
     init()
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(context: Context) {
     this.context = context
     glInterface = OffScreenGlThread(context)
@@ -75,7 +73,7 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
     videoEncoder = VideoEncoder(this)
     microphoneManager = MicrophoneManager(this)
     audioEncoder = AudioEncoder(this)
-    recordController = RecordController()
+    recordController = AndroidMuxerRecordController()
     vlcVideoLibrary = VlcVideoLibrary(context, this, glInterface?.surfaceTexture)
     vlcVideoLibrary?.setOptions(options)
   }
@@ -105,23 +103,23 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
    * @return true if success, false if you get a error (Normally because the encoder selected
    * doesn't support any configuration seated or your device hasn't a H264 encoder).
    */
-  fun prepareVideo(width: Int, height: Int, fps: Int, bitrate: Int, hardwareRotation: Boolean,
-                   iFrameInterval: Int, rotation: Int): Boolean {
+  fun prepareVideo(width: Int, height: Int, fps: Int, bitrate: Int, iFrameInterval: Int,
+                   rotation: Int): Boolean {
     if (onPreview) {
       stopPreview()
       onPreview = true
     }
     val formatVideoEncoder = FormatVideoEncoder.SURFACE
-    return videoEncoder.prepareVideoEncoder(width, height, fps, bitrate, rotation, hardwareRotation,
-        iFrameInterval, formatVideoEncoder)
+    return videoEncoder.prepareVideoEncoder(width, height, fps, bitrate, rotation, iFrameInterval,
+      formatVideoEncoder)
   }
 
   /**
    * backward compatibility reason
    */
-  fun prepareVideo(width: Int, height: Int, fps: Int, bitrate: Int, hardwareRotation: Boolean,
+  fun prepareVideo(width: Int, height: Int, fps: Int, bitrate: Int,
                    rotation: Int): Boolean {
-    return prepareVideo(width, height, fps, bitrate, hardwareRotation, 2, rotation)
+    return prepareVideo(width, height, fps, bitrate, 2, rotation)
   }
 
   protected abstract fun prepareAudioRtp(isStereo: Boolean, sampleRate: Int)
@@ -142,7 +140,9 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
                    noiseSuppressor: Boolean): Boolean {
     microphoneManager.createMicrophone(sampleRate, isStereo, echoCanceler, noiseSuppressor)
     prepareAudioRtp(isStereo, sampleRate)
-    return audioEncoder.prepareAudioEncoder(bitrate, sampleRate, isStereo)
+    return audioEncoder.prepareAudioEncoder(bitrate, sampleRate, isStereo,
+      microphoneManager.maxInputSize
+    )
   }
 
   /**
@@ -154,7 +154,7 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
    */
   fun prepareVideo(): Boolean {
     val rotation = CameraHelper.getCameraOrientation(context)
-    return prepareVideo(640, 480, 30, 1200 * 1024, false, rotation)
+    return prepareVideo(640, 480, 30, 1200 * 1024, rotation)
   }
 
   /**
@@ -182,7 +182,6 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
    * @param path where file will be saved.
    * @throws IOException If you init it before start stream.
    */
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   @Throws(IOException::class)
   fun startRecord(path: String, listener: RecordController.Listener?) {
     recordController.startRecord(path, listener)
@@ -193,7 +192,6 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
     }
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   @Throws(IOException::class)
   fun startRecord(path: String) {
     startRecord(path, null)
@@ -202,7 +200,6 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
   /**
    * Stop record MP4 video started with @startRecord. If you don't call it file will be unreadable.
    */
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   fun stopRecord() {
     recordController.stopRecord()
     if (!streaming) stopStream()
@@ -358,23 +355,6 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
     return videoEnabled
   }
 
-  /**
-   * Disable send camera frames and send a black image with low bitrate(to reduce bandwith used)
-   * instance it.
-   */
-  fun disableVideo() {
-    videoEncoder.startSendBlackImage()
-    videoEnabled = false
-  }
-
-  /**
-   * Enable send camera frames.
-   */
-  fun enableVideo() {
-    videoEncoder.stopSendBlackImage()
-    videoEnabled = true
-  }
-
   fun getBitrate(): Int {
     return videoEncoder.bitRate
   }
@@ -400,7 +380,6 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
    *
    * @param bitrate H264 in kb.
    */
-  @RequiresApi(api = Build.VERSION_CODES.KITKAT)
   fun setVideoBitrateOnFly(bitrate: Int) {
     videoEncoder.setVideoBitrateOnFly(bitrate)
   }
@@ -471,11 +450,7 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
 
   protected abstract fun onSpsPpsVpsRtp(sps: ByteBuffer, pps: ByteBuffer, vps: ByteBuffer?)
 
-  override fun onSpsPps(sps: ByteBuffer, pps: ByteBuffer) {
-    if (streaming) onSpsPpsVpsRtp(sps, pps, null)
-  }
-
-  override fun onSpsPpsVps(sps: ByteBuffer, pps: ByteBuffer, vps: ByteBuffer) {
+  override fun onSpsPpsVps(sps: ByteBuffer, pps: ByteBuffer, vps: ByteBuffer?) {
     if (streaming) onSpsPpsVpsRtp(sps, pps, vps)
   }
 
@@ -486,8 +461,8 @@ abstract class VLCReStreamerBase : GetAacData, GetVideoData, GetMicrophoneData, 
     if (streaming) getH264DataRtp(h264Buffer, info)
   }
 
-  override fun inputPCMData(buffer: ByteArray, size: Int) {
-    audioEncoder.inputPCMData(buffer, size)
+  override fun inputPCMData(frame: Frame) {
+    audioEncoder.inputPCMData(frame)
   }
 
   override fun onVideoFormat(mediaFormat: MediaFormat) {

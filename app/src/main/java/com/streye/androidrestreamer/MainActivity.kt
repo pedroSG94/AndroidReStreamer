@@ -1,23 +1,25 @@
 package com.streye.androidrestreamer
 
 import android.os.Bundle
-import android.support.v7.app.AppCompatActivity
 import android.view.SurfaceHolder
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.pedro.encoder.input.video.CameraHelper
+import com.pedro.rtmp.utils.ConnectCheckerRtmp
+import com.pedro.rtplibrary.view.OpenGlView
 import com.streye.androidrestreamer.plugin.VLCReStreamerRtmp
-import kotlinx.android.synthetic.main.activity_main.*
-import net.ossrs.rtmp.ConnectCheckerRtmp
 
 class MainActivity : AppCompatActivity(), SurfaceHolder.Callback, ConnectCheckerRtmp {
 
-  private val streamURL = "rtmp://10.7.12.62/live/pedro"
-  private val vlcURL = "rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mov"
+  private val streamURL = "rtmp://192.168.0.191/live/pedro"
+  private val vlcURL = "rtmp://192.168.0.191/live/test"
 
   private lateinit var vlcReStreamerRtmp: VLCReStreamerRtmp
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
+    val surfaceView = findViewById<OpenGlView>(R.id.surfaceView)
     vlcReStreamerRtmp = VLCReStreamerRtmp(surfaceView, this)
     surfaceView.holder.addCallback(this)
   }
@@ -35,8 +37,16 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback, ConnectChecker
     }
   }
 
+  override fun onConnectionStartedRtmp(rtmpUrl: String) {
+
+  }
+
   override fun onDisconnectRtmp() {
     runOnUiThread { Toast.makeText(this@MainActivity, "Disconnected", Toast.LENGTH_SHORT).show() }
+  }
+
+  override fun onNewBitrateRtmp(bitrate: Long) {
+
   }
 
   override fun onAuthErrorRtmp() {
@@ -47,20 +57,19 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback, ConnectChecker
     runOnUiThread { Toast.makeText(this@MainActivity, "Auth success", Toast.LENGTH_SHORT).show() }
   }
 
-  override fun surfaceChanged(p0: SurfaceHolder?, p1: Int, p2: Int, p3: Int) {
+  override fun surfaceChanged(holder: SurfaceHolder, p1: Int, p2: Int, p3: Int) {
     if (!vlcReStreamerRtmp.isStreaming()) {
-      if (vlcReStreamerRtmp.isRecording() || vlcReStreamerRtmp.prepareAudio() && vlcReStreamerRtmp.prepareVideo()) {
+      if (vlcReStreamerRtmp.prepareAudio() && vlcReStreamerRtmp.prepareVideo(1280, 720, 30, 3000 * 1000, CameraHelper.getCameraOrientation(this))) {
         vlcReStreamerRtmp.startStream(streamURL, vlcURL)
       }
     }
   }
 
-  override fun surfaceDestroyed(p0: SurfaceHolder?) {
-    if (vlcReStreamerRtmp.isStreaming()) vlcReStreamerRtmp.stopStream()
-    if (vlcReStreamerRtmp.isOnPreview()) vlcReStreamerRtmp.stopPreview()
+  override fun surfaceCreated(holder: SurfaceHolder) {
+
   }
 
-  override fun surfaceCreated(p0: SurfaceHolder?) {
+  override fun surfaceDestroyed(holder: SurfaceHolder) {
 
   }
 }

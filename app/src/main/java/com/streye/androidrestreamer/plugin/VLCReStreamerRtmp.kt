@@ -2,12 +2,16 @@ package com.streye.androidrestreamer.plugin
 
 import android.content.Context
 import android.media.MediaCodec
-import android.os.Build
-import android.support.annotation.RequiresApi
+import com.pedro.encoder.utils.CodecUtil
+import com.pedro.rtmp.flv.video.ProfileIop
+import com.pedro.rtmp.rtmp.RtmpClient
+import com.pedro.rtmp.utils.ConnectCheckerRtmp
 import com.pedro.rtplibrary.view.LightOpenGlView
 import com.pedro.rtplibrary.view.OpenGlView
-import net.ossrs.rtmp.ConnectCheckerRtmp
-import net.ossrs.rtmp.SrsFlvMuxer
+import com.pedro.rtsp.rtsp.Protocol
+import com.pedro.rtsp.rtsp.RtspClient
+import com.pedro.rtsp.rtsp.VideoCodec
+import com.pedro.rtsp.utils.ConnectCheckerRtsp
 import java.nio.ByteBuffer
 
 
@@ -17,105 +21,101 @@ import java.nio.ByteBuffer
 
 class VLCReStreamerRtmp : VLCReStreamerBase {
 
-  private val srsFlvMuxer: SrsFlvMuxer
+  private val rtmpClient: RtmpClient
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(openGlView: OpenGlView, connectChecker: ConnectCheckerRtmp) : super(openGlView) {
-    srsFlvMuxer = SrsFlvMuxer(connectChecker)
+    rtmpClient = RtmpClient(connectChecker)
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(lightOpenGlView: LightOpenGlView, connectChecker: ConnectCheckerRtmp) :
       super(lightOpenGlView) {
-    srsFlvMuxer = SrsFlvMuxer(connectChecker)
+    rtmpClient = RtmpClient(connectChecker)
   }
 
-  @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN_MR2)
   constructor(context: Context, connectChecker: ConnectCheckerRtmp) : super(context) {
-    srsFlvMuxer = SrsFlvMuxer(connectChecker)
+    rtmpClient = RtmpClient(connectChecker)
   }
 
   /**
-   * H264 profile.
+   * Internet protocol used.
    *
-   * @param profileIop Could be ProfileIop.BASELINE or ProfileIop.CONSTRAINED
+   * @param protocol Could be Protocol.TCP or Protocol.UDP.
    */
-  fun setProfileIop(profileIop: Byte) {
-    srsFlvMuxer.setProfileIop(profileIop)
+  fun setProfileIop(profileIop: ProfileIop) {
+    rtmpClient.setProfileIop(profileIop)
   }
 
   @Throws(RuntimeException::class)
   override fun resizeCache(newSize: Int) {
-    srsFlvMuxer.resizeFlvTagCache(newSize)
+    rtmpClient.resizeCache(newSize)
   }
 
   override fun getCacheSize(): Int {
-    return srsFlvMuxer.flvTagCacheSize
+    return rtmpClient.cacheSize
   }
 
   override fun getSentAudioFrames(): Long {
-    return srsFlvMuxer.sentAudioFrames
+    return rtmpClient.sentAudioFrames
   }
 
   override fun getSentVideoFrames(): Long {
-    return srsFlvMuxer.sentVideoFrames
+    return rtmpClient.sentVideoFrames
   }
 
   override fun getDroppedAudioFrames(): Long {
-    return srsFlvMuxer.droppedAudioFrames
+    return rtmpClient.droppedAudioFrames
   }
 
   override fun getDroppedVideoFrames(): Long {
-    return srsFlvMuxer.droppedVideoFrames
+    return rtmpClient.droppedVideoFrames
   }
 
   override fun resetSentAudioFrames() {
-    srsFlvMuxer.resetSentAudioFrames()
+    rtmpClient.resetSentAudioFrames()
   }
 
   override fun resetSentVideoFrames() {
-    srsFlvMuxer.resetSentVideoFrames()
+    rtmpClient.resetSentVideoFrames()
   }
 
   override fun resetDroppedAudioFrames() {
-    srsFlvMuxer.resetDroppedAudioFrames()
+    rtmpClient.resetDroppedAudioFrames()
   }
 
   override fun resetDroppedVideoFrames() {
-    srsFlvMuxer.resetDroppedVideoFrames()
+    rtmpClient.resetDroppedVideoFrames()
+  }
+
+  fun setVideoCodec(videoCodec: VideoCodec) {
+    videoEncoder.type =
+      if (videoCodec == VideoCodec.H265) CodecUtil.H265_MIME else CodecUtil.H264_MIME
   }
 
   override fun setAuthorization(user: String, password: String) {
-    srsFlvMuxer.setAuthorization(user, password)
+    rtmpClient.setAuthorization(user, password)
   }
 
   override fun prepareAudioRtp(isStereo: Boolean, sampleRate: Int) {
-    srsFlvMuxer.setIsStereo(isStereo)
-    srsFlvMuxer.setSampleRate(sampleRate)
+    rtmpClient.setAudioInfo(sampleRate, isStereo)
   }
 
   override fun startStreamRtp(url: String) {
-    if (videoEncoder.rotation == 90 || videoEncoder.rotation == 270) {
-      srsFlvMuxer.setVideoResolution(videoEncoder.height, videoEncoder.width)
-    } else {
-      srsFlvMuxer.setVideoResolution(videoEncoder.width, videoEncoder.height)
-    }
-    srsFlvMuxer.start(url)
+    rtmpClient.connect(url)
   }
 
   override fun stopStreamRtp() {
-    srsFlvMuxer.stop()
+    rtmpClient.disconnect()
   }
 
   override fun getAacDataRtp(aacBuffer: ByteBuffer, info: MediaCodec.BufferInfo) {
-    srsFlvMuxer.sendAudio(aacBuffer, info)
+    rtmpClient.sendAudio(aacBuffer, info)
   }
 
   override fun onSpsPpsVpsRtp(sps: ByteBuffer, pps: ByteBuffer, vps: ByteBuffer?) {
-    srsFlvMuxer.setSpsPPs(sps, pps)
+    rtmpClient.setVideoInfo(sps, pps, vps)
   }
 
   override fun getH264DataRtp(h264Buffer: ByteBuffer, info: MediaCodec.BufferInfo) {
-    srsFlvMuxer.sendVideo(h264Buffer, info)
+    rtmpClient.sendVideo(h264Buffer, info)
   }
 }
